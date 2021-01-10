@@ -10,7 +10,6 @@ if (process.env.NODE_ENV !== "production") {
   const path = require("path");
   const port = process.env.PORT || 3000;
 
-  app.use(express.static(path.join(__dirname, "public")));
   
   app.use(bodyParser.urlencoded({ extended: false, limit: "10mb" }));
   app.use(bodyParser.json({ limit: "10mb" }));
@@ -26,11 +25,20 @@ if (process.env.NODE_ENV !== "production") {
     })
   );
   
+//file route
+const fileRoute = require('./routes/files')
+app.use("/files", fileRoute)
 
-app.get("/", (req, res)=>{
-    res.send('HI')
-})
+const userRoute = require('./routes/users')
+app.use("/users", userRoute)
 
+
+//connect to db..........................................................
+const mongoose = require("mongoose")
+mongoose.connect(process.env.DATABASE_URL, {useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true, useFindAndModify: false})
+const db = mongoose.connection
+db.on("error", error => console.log(error))
+db.on("open", () => console.log("Connected to DB"))
 
 
 app.listen(port, () => {
