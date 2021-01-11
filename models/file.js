@@ -18,6 +18,10 @@ const fileSchema = mongoose.Schema({
         type: String,
         required:true
     },
+    fileKey:{
+        type: String,
+        required:true
+    },
     fileSize:{
         type: String,
         required:true

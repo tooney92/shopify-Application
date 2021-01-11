@@ -80,41 +80,6 @@ module.exports.login = async(req, res)=>{
     }
 }
 
-module.exports.update = async(req,res)=>{
-    try {
-        
-            const {userName} = req.user
-            body = req.body
-            delete body.role
-            console.log(req.body);
-            const updatedUser=  await User.findOneAndUpdate({userName: userName}, {
-                $set: body
-            },{
-                new: true
-            })
-            if(updatedUser){
-                console.log(updatedUser);
-                return res.json({message:"update successful", user: updatedUser})
-            }else{
-                return res.status(422).send("unable to update")
-            }
-    } catch (error) {
-        console.log(error);
-        return res.status(422).json({error: "unable to process request"})
-        
-    }
-}
-
-module.exports.deactivate = async(req, res)=>{
-    try {
-        const deactivate = await User.findOneAndUpdate({_id: req.user._id}, {deactivate: true})
-        if(deactivate) return res.send("account deactivated")
-        res.status(422).send("unable to deactivate account")
-    } catch (error) {
-        console.log(error);
-        res.status(422).send("error whiel deactivating account")
-    }
-}
 
 
 

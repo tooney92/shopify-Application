@@ -5,6 +5,7 @@ module.exports.mimeCheck = (files, mimeTypes) => {
     files.forEach(file => {
         if(!mimeTypes.includes(file.mimetype))
         {
+            // console.log(file);
             invalidFiles.push(file.name)
         } 
     });

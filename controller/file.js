@@ -8,7 +8,7 @@ const fs = require('fs');
 const AWS = require('aws-sdk');
 const path = require('path')
 const { uuid } = require('uuidv4')
-const {mimeCheck} = require('../helpers/file')
+const { mimeCheck } = require('../helpers/file')
 
 
 //format errors from the node-input validator into an array 
@@ -55,9 +55,42 @@ const uploadFile = (params) => {
     })
 }
 
+const deleteAwsFiles = (params) => {
+    return new Promise((resolve, reject) => {
+        s3.deleteObjects(params,  (err, data) => {
+            if(err) {
+                console.log(err, err.stack)
+                return reject(err)
+            }
+            else
+            {
+                console.log(data)
+                return resolve(data)
+            } 
+        })
+    })
+}
+
+const deleteAwsFile = (params) => {
+    return new Promise((resolve, reject) => {
+        s3.deleteObject(params,  (err, data) => {
+            if(err) {
+                console.log(err, err.stack)
+                return reject(err)
+            }
+            else
+            {
+                console.log("file deleted successfully")
+                return resolve(data)
+            } 
+        })
+    })
+}
+
 
 module.exports.bulkUploads = async (req, res) => {
     try {
+
         req.setTimeout(500000);
         if (!req.files || Object.keys(req.files).length === 0) return res.status(400).send('No files were attached.')
 
@@ -70,17 +103,17 @@ module.exports.bulkUploads = async (req, res) => {
 
         //files uploaded
         const files = req.files.uploads
-        
+
         //check for invalif formats
         // console.log(files);
         const filesCheck = mimeCheck(files, mimeTypes)
-        if(filesCheck.issues) return res.status(400).json({
+        if (filesCheck.issues) return res.status(400).json({
             message: "invalid file format",
             files: filesCheck.invalidFiles,
             permittedFormat: "png, jpg, jpeg, gif"
         })
-        
-        if(files.length > 20) return res.status(400).send("only 20 files per upload is allowed")
+
+        if (files.length > 20) return res.status(400).send("only 20 files per upload is allowed")
 
         //bulk uploads
         const userFiles = []
@@ -99,7 +132,7 @@ module.exports.bulkUploads = async (req, res) => {
                 ACL: req.query.private === "true" ? 'private' : "public-read"
             };
             const result = await uploadFile(params)
-            
+    
             //create the record to be sent to DB
             const userFile = {}
 
@@ -108,6 +141,7 @@ module.exports.bulkUploads = async (req, res) => {
             userFile.fileName = file.name
             userFile.extension = file.mimetype
             userFile.fileSize = file.size
+            userFile.fileKey = result.Key
             userFile.filePath = result.Location
             const record = new File(userFile)
             await record.save()
@@ -138,7 +172,7 @@ module.exports.singleUpload = async (req, res) => {
         let file = req.files.uploads
 
         //file format check
-        if(!mimeTypes.includes(file.mimetype)) return res.status(400).send("file format must be png, jpg, jpeg, gif")
+        if (!mimeTypes.includes(file.mimetype)) return res.status(400).send("file format must be png, jpg, jpeg, gif")
 
         let extension = path.extname(file.name)
         let filename = uuid() + extension
@@ -160,12 +194,13 @@ module.exports.singleUpload = async (req, res) => {
         userFile.fileName = file.name
         userFile.extension = file.mimetype
         userFile.fileSize = file.size
+        userFile.fileKey = result.Key
         userFile.filePath = result.Location
 
         const record = new File(userFile)
         await record.save()
 
-        res.json({file: record})
+        res.json({ file: record })
 
     } catch (error) {
         console.log(error);
@@ -174,6 +209,87 @@ module.exports.singleUpload = async (req, res) => {
 
 }
 
+module.exports.bulkDelete = async (req, res) => {
+    try {
 
+        const v = new Validator(req.body, {
+
+            "files": "required|array"
+        })
+
+        const match = await v.check()
+        if (!match) return res.status(422).json(VerrorsMessageFormatter(v.errors))
+
+        //get the files and file keys from the req body
+        const {files} = req.body
+        
+        //fetch the AWS file keys from the DB
+        const userFileKeys = await File.find({ userId: req.user._id, _id: { $in: [...files] } }).select("fileKey")
+
+        if (userFileKeys.length < files.length) return res.status(400).send("unable to delete files. No corresponding keys")
+        
+        //array to hold keys to be sent to AWS for deleting.
+        const awsKeyParams = []
+        userFileKeys.forEach(file => {
+            awsKeyParams.push({ Key: file.fileKey })
+        });
+
+        //AWS params
+        const params = {
+            Bucket: process.env.bucketName,
+            Delete: {
+                Objects: awsKeyParams,
+                Quiet: false
+            }
+        };
+
+        //delete files from AWS using helper function
+        const awsDelete =  await deleteAwsFiles(params)
+
+        // //query ensures user with token is the owner of the file
+        const deleteFiles = await File.deleteMany({ userId: req.user._id, _id: { $in: [...files] } })
+        res.send("Files deleted successfully")
+
+        } catch (error) {
+            console.log(error);
+            res.status(500).send(error)
+        }
+    }
+
+module.exports.singleDelete = async (req, res) => {
+        try {
+
+            const v = new Validator(req.body, {
+                "file": "required"
+            })
+    
+            const match = await v.check()
+            if (!match) return res.status(422).json(VerrorsMessageFormatter(v.errors))
+    
+            //get the files and file keys from the req body
+            const {file} = req.body
+            
+            //fetch the AWS file key from the DB
+            const userFile = await File.findOne({ userId: req.user._id, _id: file }).select("fileKey")
+            if (!userFile) return res.status(400).send("unable to delete file.")
+        
+            // AWS params
+            const params = {
+                Bucket: process.env.bucketName,
+                Key: userFile.fileKey
+            };
+    
+            //delete files from AWS using helper function
+            const awsDelete =  await deleteAwsFile(params)
+    
+            // //query ensures user with token is the owner of the file
+            const deletedFile = await File.deleteOne({ userId: req.user._id, _id: file })
+            res.send("File deleted successfully")
+
+        } catch (error) {
+            console.log(error);
+            res.status(500).send("oops")
+        }
+    }
 
 
