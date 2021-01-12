@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken")
 const {verifyToken} = require("../middleware/auth")
-const {bulkUploads, singleUpload,bulkDelete,singleDelete} = require("../Controller/file")
+const {bulkUploads, singleUpload,bulkDelete,singleDelete} = require("../controller/file")
 
 //upload files
 router.post("/", verifyToken, bulkUploads)
