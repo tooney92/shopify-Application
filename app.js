@@ -25,12 +25,34 @@ if (process.env.NODE_ENV !== "production") {
     })
   );
   
+
+app.get("/", (req, res)=>{
+  res.send('My Shopify-Challenge API')
+})
+
 //file route
 const fileRoute = require('./routes/files')
 app.use("/files", fileRoute)
 
+//user route
 const userRoute = require('./routes/users')
 app.use("/users", userRoute)
+
+// handles requests made to inexistent endpoints
+app.use((req, res, next)=>{
+  const error = new Error('page not found');
+  error.status = 404; 
+  next(error);
+})
+app.use((error, req, res, next)=>{
+  res.status(error.status || 500);
+  res.json({
+      error: {
+          message: error.message
+      },
+      handled: false
+  });
+})
 
 
 //connect to db..........................................................
