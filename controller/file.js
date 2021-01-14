@@ -8,7 +8,7 @@ const fs = require('fs');
 const AWS = require('aws-sdk');
 const path = require('path')
 const { uuid } = require('uuidv4')
-const { mimeCheck } = require('../helpers/file')
+const { issuesCheck } = require('../helpers/file')
 
 
 //format errors from the node-input validator into an array 
@@ -95,7 +95,7 @@ module.exports.bulkUploads = async (req, res) => {
         if (!req.files || Object.keys(req.files).length === 0) return res.status(400).send('No files were attached.')
 
         const v = new Validator(req.files, {
-            "uploads": "required"
+            "uploads": "required|array"
         })
 
         const match = await v.check()
@@ -104,13 +104,12 @@ module.exports.bulkUploads = async (req, res) => {
         //files uploaded
         const files = req.files.uploads
 
-        //check for invalif formats
-        // console.log(files);
-        const filesCheck = mimeCheck(files, mimeTypes)
-        if (filesCheck.issues) return res.status(400).json({
-            message: "invalid file format",
-            files: filesCheck.invalidFiles,
-            permittedFormat: "png, jpg, jpeg, gif"
+        //check for invalid formats
+        const filesIssues = issuesCheck(files, mimeTypes)
+        if (filesIssues) return res.status(400).json({
+            filesIssues,
+            permittedFormats: "png, jpg, jpeg, gif",
+            permittedSize: "2MB",
         })
 
         if (files.length > 20) return res.status(400).send("only 20 files per upload is allowed")
@@ -135,7 +134,6 @@ module.exports.bulkUploads = async (req, res) => {
     
             //create the record to be sent to DB
             const userFile = {}
-
             userFile.private = req.query.private === "true" ? true : false
             userFile.userId = req.user._id
             userFile.fileName = file.name
@@ -151,8 +149,7 @@ module.exports.bulkUploads = async (req, res) => {
         res.json(userFiles)
 
     } catch (error) {
-        console.log(error);
-        res.status(500).send("oops")
+        res.status(500).send("unable to perform request")
     }
 }
 
@@ -161,7 +158,6 @@ module.exports.singleUpload = async (req, res) => {
     try {
 
         if (!req.files || Object.keys(req.files).length === 0) return res.status(400).send('No files were attached.')
-
         const v = new Validator(req.files, {
             "uploads": "required"
         })
@@ -172,7 +168,9 @@ module.exports.singleUpload = async (req, res) => {
         let file = req.files.uploads
 
         //file format check
-        if (!mimeTypes.includes(file.mimetype)) return res.status(400).send("file format must be png, jpg, jpeg, gif")
+        if (!mimeTypes.includes(file.mimetype) || file.size > 2000000){
+            return res.status(400).send("file format must be png, jpg, jpeg, gif and less than 2MB")
+        } 
 
         let extension = path.extname(file.name)
         let filename = uuid() + extension
@@ -186,9 +184,8 @@ module.exports.singleUpload = async (req, res) => {
             ACL: req.query.private === "true" ? 'private' : "public-read"
         };
         const result = await uploadFile(params)
-        console.log(result);
-        //create the record to be sent to DB
 
+        //create the record to be sent to DB
         const userFile = {}
         userFile.userId = req.user._id
         userFile.fileName = file.name
@@ -196,7 +193,6 @@ module.exports.singleUpload = async (req, res) => {
         userFile.fileSize = file.size
         userFile.fileKey = result.Key
         userFile.filePath = result.Location
-
         const record = new File(userFile)
         await record.save()
 
@@ -204,7 +200,7 @@ module.exports.singleUpload = async (req, res) => {
 
     } catch (error) {
         console.log(error);
-        res.status(500).send(error)
+        res.status(500).send("unable to perform request")
     }
 
 }
@@ -291,5 +287,3 @@ module.exports.singleDelete = async (req, res) => {
             res.status(500).send("oops")
         }
     }
-
-
