@@ -163,7 +163,6 @@ module.exports.filesUpload = async (req, res) => {
     }
 }
 
-
 module.exports.bulkDelete = async (req, res) => {
     try {
 
