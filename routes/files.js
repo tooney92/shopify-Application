@@ -2,13 +2,10 @@ const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken")
 const {verifyToken} = require("../middleware/auth")
-const {bulkUploads, singleUpload,bulkDelete,singleDelete} = require("../controller/file")
+const {filesUpload, singleUpload,bulkDelete,singleDelete} = require("../controller/file")
 
 //upload files
-router.post("/", verifyToken, bulkUploads)
-
-//upload file
-router.post("/single", verifyToken, singleUpload)
+router.post("/", verifyToken, filesUpload)
 
 //delete files
 router.delete("/", verifyToken, bulkDelete)
