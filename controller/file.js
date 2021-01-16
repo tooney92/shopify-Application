@@ -88,7 +88,9 @@ const deleteAwsFile = (params) => {
 module.exports.filesUpload = async (req, res) => {
     try {
 
-        req.setTimeout(500000);
+        //timeout is set to 10mins
+        req.setTimeout(1000000);
+
         if (!req.files || Object.keys(req.files).length === 0) return res.status(400).send('No files were attached.')
 
         if (!req.files.hasOwnProperty("uploads")) {
@@ -161,16 +163,18 @@ module.exports.filesUpload = async (req, res) => {
 module.exports.bulkDelete = async (req, res) => {
     try {
 
-        const v = new Validator(req.body, {
+        //timeout is set to 10mins
+        req.setTimeout(1000000);
 
+        const v = new Validator(req.body, {
             "files": "required|array"
         })
 
         const match = await v.check()
         if (!match) return res.status(400).json({error: VerrorsMessageFormatter(v.errors)})
-    
-        //get the files and file keys from the req body
+        
         const { files } = req.body
+        if (files.length > 20) return res.status(400).send("Only 20 files can be deleted per request")
 
         //fetch the AWS file keys from the DB
         const userFileKeys = await File.find({ userId: req.user._id, _id: { $in: [...files] } }).select("fileKey")
