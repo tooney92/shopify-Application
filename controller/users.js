@@ -49,7 +49,7 @@ module.exports.signUp = async (req, res) => {
     } catch (error) {
         console.log(error);
         if (error.code === 11000) return res.status(422).json({ error: duplicateMessageFormatter(error.keyPattern) })
-        return res.status(422).send("issues registering account")
+        return res.status(500).send("issues registering account")
     }
 }
 
@@ -65,8 +65,6 @@ module.exports.login = async (req, res) => {
         const { userName } = req.body
         const user = await User.findOne({ userName: userName })
         if (!user) return res.status(422).json({ error: "User name does not exist!" })
-
-        if (user.deactivate) return res.status(422).json({ error: "account has been deactivated please contact help desk" })
         const matchPassword = await bcrypt.compare(req.body.password, user.password)
 
         await jwt.sign({ data: user }, process.env.token_secret, { expiresIn: 60 * 60 * 24 }, (err, token) => {
@@ -75,7 +73,6 @@ module.exports.login = async (req, res) => {
         })
 
     } catch (error) {
-        console.log(error);
-        return res.status(422).json({ error: error })
+        return res.status(500).send("issues performing request")
     }
 }

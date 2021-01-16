@@ -85,7 +85,6 @@ const deleteAwsFile = (params) => {
     })
 }
 
-
 module.exports.filesUpload = async (req, res) => {
     try {
 
@@ -127,7 +126,6 @@ module.exports.filesUpload = async (req, res) => {
 
         const userFiles = []
         for (let count = 0; count < files.length; count++) {
-
             let file = files[count]
             let extension = path.extname(file.name)
             let filename = uuid() + extension
@@ -154,11 +152,8 @@ module.exports.filesUpload = async (req, res) => {
             await record.save()
             userFiles.push(record)
         }
-
-        res.json(userFiles)
-
+        res.status(201).json(userFiles)
     } catch (error) {
-        console.log(error);
         res.status(500).send("unable to perform request")
     }
 }
@@ -172,15 +167,15 @@ module.exports.bulkDelete = async (req, res) => {
         })
 
         const match = await v.check()
-        if (!match) return res.status(422).json(VerrorsMessageFormatter(v.errors))
-
+        if (!match) return res.status(400).json({error: VerrorsMessageFormatter(v.errors)})
+    
         //get the files and file keys from the req body
         const { files } = req.body
 
         //fetch the AWS file keys from the DB
         const userFileKeys = await File.find({ userId: req.user._id, _id: { $in: [...files] } }).select("fileKey")
-
-        if (userFileKeys.length < files.length) return res.status(400).send("unable to delete files. No corresponding keys")
+        if (userFileKeys.length < 1) return res.status(403).send("user has no files with requested IDs.")
+        if (userFileKeys.length < files.length) return res.status(403).send("unable to delete files. No corresponding keys")
 
         //array to hold keys to be sent to AWS for deleting.
         const awsKeyParams = []
@@ -203,10 +198,9 @@ module.exports.bulkDelete = async (req, res) => {
         // //query ensures user with token is the owner of the file
         const deleteFiles = await File.deleteMany({ userId: req.user._id, _id: { $in: [...files] } })
         res.send("Files deleted successfully")
-
     } catch (error) {
-        console.log(error);
-        res.status(500).send(error)
+        if(error.name == "CastError") return res.status(404).json({message: "Invalid ID provided", _id: error.value})
+        res.status(500).json({error: error.message})
     }
 }
 
@@ -218,14 +212,14 @@ module.exports.singleDelete = async (req, res) => {
         })
 
         const match = await v.check()
-        if (!match) return res.status(422).json(VerrorsMessageFormatter(v.errors))
+        if (!match) return res.status(400).json({error: VerrorsMessageFormatter(v.errors)})
 
         //get the files and file keys from the req body
         const { file } = req.body
 
-        //fetch the AWS file key from the DB
+        //fetch the AWS file key from the DB using the user info embedded in the token. 
         const userFile = await File.findOne({ userId: req.user._id, _id: file }).select("fileKey")
-        if (!userFile) return res.status(400).send("unable to delete file.")
+        if (!userFile) return res.status(400).send("user has no file with requested ID.")
 
         // AWS params
         const params = {
@@ -241,7 +235,7 @@ module.exports.singleDelete = async (req, res) => {
         res.send("File deleted successfully")
 
     } catch (error) {
-        console.log(error);
-        res.status(500).send("oops")
+        if(error.name == "CastError") return res.status(500).send("Invalid ID provided")
+        res.status(500).json({error: error.message})
     }
 }

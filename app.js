@@ -7,6 +7,7 @@ if (process.env.NODE_ENV !== "production") {
   const cors = require("cors");
   const bodyParser = require("body-parser");
   const fileUpload = require("express-fileupload");
+  const helmet = require("helmet")
   const path = require("path");
   const port = process.env.PORT || 3000;
 
@@ -15,6 +16,9 @@ if (process.env.NODE_ENV !== "production") {
   app.use(bodyParser.json({ limit: "10mb" }));
   
   app.use(cors());
+
+  //helmet secures app by setting various http headers
+  app.use(helmet())
   
   app.use(
     fileUpload({
